@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "Patient": {
+      "title": "Patient",
+      "description": "The centralized patient record.",
+      "type": "object",
+      "properties": {
+        "fileNumber": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "dob": { "type": "string", "format": "date" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "bloodGroup": { "type": "string" },
+        "nextOfKin": { "type": "string" },
+        "patientType": { "type": "string" },
+        "appointmentDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["waiting_payment", "ready_nursing", "waiting_doctor", "sent_lab", "at_pharmacy", "completed"] },
+        "walletBalance": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fileNumber", "fullName", "status"]
+    },
+    "Vitals": {
+      "title": "Vitals",
+      "description": "Nursing vitals recorded for a visit.",
+      "type": "object",
+      "properties": {
+        "bp": { "type": "string" },
+        "temp": { "type": "number" },
+        "pulse": { "type": "number" },
+        "weight": { "type": "number" },
+        "observations": { "type": "string" },
+        "nurseId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Consultation": {
+      "title": "Consultation",
+      "description": "Doctor's clinical notes and diagnosis.",
+      "type": "object",
+      "properties": {
+        "diagnosis": { "type": "string" },
+        "treatmentPlan": { "type": "string" },
+        "clinicalNotes": { "type": "string" },
+        "doctorId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Wallet transaction record.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["deposit", "debit"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "staffId": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/patients": {
+      "schema": "Patient",
+      "description": "Main patient records."
+    },
+    "/patients/{patientId}/vitals": {
+      "schema": "Vitals",
+      "description": "Historical vitals for the patient."
+    },
+    "/patients/{patientId}/consultations": {
+      "schema": "Consultation",
+      "description": "Historical doctor consultations."
+    },
+    "/patients/{patientId}/transactions": {
+      "schema": "Transaction",
+      "description": "Patient wallet history."
+    },
+    "/auditLogs": {
+      "schema": "object",
+      "description": "System-wide audit trail."
+    }
+  }
+}

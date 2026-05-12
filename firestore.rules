@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Role helpers (In a real app, these would check a 'roles' collection or custom claims)
+    // For this demo, we'll allow role-based access if the user has a "role" field in their profile or a header.
+    // However, since we're using Demo Login without real auth roles yet, we'll implement standard security
+    // that assumes the app is used responsibly but prevents common bypasses.
+    
+    function isValidPatient(data) {
+      return data.fullName is string && data.fullName.size() > 0 
+          && data.fileNumber is string && data.fileNumber.size() > 0
+          && data.status in ['waiting_payment', 'ready_nursing', 'waiting_doctor', 'sent_lab', 'at_pharmacy', 'completed'];
+    }
+
+    // --- Collections ---
+
+    match /patients/{patientId} {
+      allow read: if isSignedIn();
+      
+      allow create: if isSignedIn() 
+        && isValidId(patientId)
+        && isValidPatient(incoming())
+        && incoming().walletBalance == 0; // Starts at 0
+
+      allow update: if isSignedIn() && (
+        // Records department updates: Personal info
+        (incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phoneNumber', 'address', 'dob', 'gender', 'bloodGroup', 'nextOfKin', 'patientType', 'appointmentDate', 'status', 'updatedAt'])) ||
+        // Accounts department updates: Wallet and status
+        (incoming().diff(existing()).affectedKeys().hasOnly(['walletBalance', 'status', 'updatedAt'])) ||
+        // General status transitions
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+    }
+
+    match /patients/{patientId}/vitals/{vitalId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(vitalId) && incoming().nurseId == request.auth.uid;
+      allow update: if false; // Locked after submission
+    }
+
+    match /patients/{patientId}/consultations/{consultId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(consultId) && incoming().doctorId == request.auth.uid;
+      allow update: if false; // Locked after submission
+    }
+
+    match /patients/{patientId}/prescriptions/{pressId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(pressId) && incoming().doctorId == request.auth.uid;
+      allow update: if isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']); // Pharmacy marks as dispensed
+    }
+
+    match /patients/{patientId}/labResults/{labId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(labId); // Lab tech or Doctor request
+      allow update: if isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['result', 'status', 'labTechId', 'updatedAt', 'completedAt']);
+    }
+
+    match /patients/{patientId}/transactions/{txId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(txId);
+      allow update: if false; // Transactions are immutable
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if false;
+    }
+  }
+}
