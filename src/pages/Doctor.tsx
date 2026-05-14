@@ -82,6 +82,28 @@ export const Doctor: React.FC = () => {
     }
   };
 
+  const handleSaveNotesOnly = async () => {
+    if (!selectedPatient) return;
+    if (!consultation.diagnosis) {
+      alert("Please enter a diagnosis before saving.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await addDoc(collection(db, `patients/${selectedPatient.id}/consultations`), {
+        ...consultation,
+        doctorId: 'DR_YILNAN',
+        timestamp: serverTimestamp()
+      });
+      alert("Consultation record saved successfully.");
+    } catch (error) {
+      alert("Error saving consultation: " + (error as any).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmitConsultation = async () => {
     if (!selectedPatient) return;
 
@@ -239,74 +261,59 @@ export const Doctor: React.FC = () => {
 
                        <div className="p-8 bg-white overflow-y-auto max-h-[500px] scrollbar-hide">
                           {activeSubTab === 'notes' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2">
-                               <div className="space-y-6">
-                                  <div className="space-y-2">
-                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Physician Diagnosis</label>
-                                     <input 
-                                       required
-                                       type="text"
-                                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all text-sm shadow-inner placeholder:text-slate-300"
-                                       placeholder="e.g. Acute Malaria Parasitemia..."
-                                       value={consultation.diagnosis}
-                                       onChange={e => setConsultation({...consultation, diagnosis: e.target.value})}
-                                     />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Clinical Progress Notes</label>
-                                    <textarea 
-                                      rows={8}
-                                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm italic text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner"
-                                      placeholder="Note presenting symptoms, duration, examination findings..."
-                                      value={consultation.clinicalNotes}
-                                      onChange={e => setConsultation({...consultation, clinicalNotes: e.target.value})}
-                                    />
-                                  </div>
-                               </div>
-                               <div className="space-y-6">
-                                  <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Management Plan</label>
-                                    <textarea 
-                                      rows={13}
-                                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner"
-                                      placeholder="Detail next steps, follow-up, and home care instructions..."
-                                      value={consultation.treatmentPlan}
-                                      onChange={e => setConsultation({...consultation, treatmentPlan: e.target.value})}
-                                    />
-                                  </div>
+                            <div className="animate-in fade-in slide-in-from-bottom-2 space-y-8">
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                 <div className="space-y-6">
+                                    <div className="space-y-2">
+                                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Physician Diagnosis</label>
+                                       <textarea 
+                                         required
+                                         rows={2}
+                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all text-sm shadow-inner placeholder:text-slate-300"
+                                         placeholder="Enter primary clinical diagnosis..."
+                                         value={consultation.diagnosis}
+                                         onChange={e => setConsultation({...consultation, diagnosis: e.target.value})}
+                                       />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Clinical Progress Notes</label>
+                                      <textarea 
+                                        rows={10}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm italic text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner"
+                                        placeholder="Detailed history, symptoms, and examination findings..."
+                                        value={consultation.clinicalNotes}
+                                        onChange={e => setConsultation({...consultation, clinicalNotes: e.target.value})}
+                                      />
+                                    </div>
+                                 </div>
+                                 <div className="space-y-6">
+                                    <div className="space-y-2">
+                                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Management & Treatment Plan</label>
+                                      <textarea 
+                                        rows={14}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner"
+                                        placeholder="Detail therapeutic interventions, patient advice, and follow-up schedules..."
+                                        value={consultation.treatmentPlan}
+                                        onChange={e => setConsultation({...consultation, treatmentPlan: e.target.value})}
+                                      />
+                                    </div>
+                                 </div>
                                </div>
 
-                               <div className="md:col-span-2 pt-8 border-t border-slate-100">
-                                  <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] mb-6">Departmental Directives</h4>
+                               <div className="pt-8 border-t border-slate-100">
+                                  <div className="flex items-center justify-between mb-6 px-1">
+                                    <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">Administrative & Station Orders</h4>
+                                    <span className="text-[9px] text-slate-400 font-bold">DEPARTMENTAL DIRECTIVES</span>
+                                  </div>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                      <div className="space-y-2">
                                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">To: Nursing Station</label>
                                         <input 
                                           type="text"
                                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
-                                          placeholder="Instructions for nurses (e.g. IV access)..."
+                                          placeholder="Nurse instructions..."
                                           value={consultation.nurseDirective}
                                           onChange={e => setConsultation({...consultation, nurseDirective: e.target.value})}
-                                        />
-                                     </div>
-                                     <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">To: Laboratory Tech</label>
-                                        <input 
-                                          type="text"
-                                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
-                                          placeholder="Specific investigation notes..."
-                                          value={consultation.labDirective}
-                                          onChange={e => setConsultation({...consultation, labDirective: e.target.value})}
-                                        />
-                                     </div>
-                                     <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">To: Pharmacy</label>
-                                        <input 
-                                          type="text"
-                                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
-                                          placeholder="Specific medication compounding notes..."
-                                          value={consultation.pharmacyDirective}
-                                          onChange={e => setConsultation({...consultation, pharmacyDirective: e.target.value})}
                                         />
                                      </div>
                                      <div className="space-y-2">
@@ -314,7 +321,7 @@ export const Doctor: React.FC = () => {
                                         <input 
                                           type="text"
                                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
-                                          placeholder="Expedite clearance or billing instructions..."
+                                          placeholder="Billing instructions..."
                                           value={consultation.accountsDirective}
                                           onChange={e => setConsultation({...consultation, accountsDirective: e.target.value})}
                                         />
@@ -326,16 +333,16 @@ export const Doctor: React.FC = () => {
 
                           {activeSubTab === 'lab' && (
                             <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6">
-                               <div className="p-12 rounded-2xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center text-center">
+                               <div className="p-10 rounded-2xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center text-center">
                                   <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-slate-100">
                                     <Beaker className="text-blue-600" size={32} />
                                   </div>
                                   <h4 className="text-xl font-black text-slate-900 tracking-tight">Enterprise Lab Order</h4>
                                   <p className="text-slate-500 text-xs max-w-sm mt-2 font-medium leading-relaxed uppercase tracking-widest">Electronic investigation request for synchronization with pathology.</p>
                                   
-                                  <div className="mt-10 w-full max-w-md">
+                                  <div className="mt-8 w-full max-w-md">
                                      <select 
-                                      className="w-full px-6 py-4 rounded-xl bg-white border border-slate-200 font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all shadow-xl shadow-slate-200/50"
+                                      className="w-full px-6 py-4 rounded-xl bg-white border border-slate-200 font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all shadow-xl shadow-slate-200/50 mb-4"
                                       value={labRequest}
                                       onChange={e => setLabRequest(e.target.value)}
                                      >
@@ -349,14 +356,15 @@ export const Doctor: React.FC = () => {
                                         <option>Renal Status (KFT)</option>
                                         <option>Electrolytes / Urea / Creatinine</option>
                                      </select>
+                                     
+                                     <input 
+                                      type="text"
+                                      className="w-full px-6 py-4 rounded-xl bg-white border border-slate-200 font-bold text-sm text-slate-900 outline-none focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
+                                      placeholder="Specific instructions for Lab Tech..."
+                                      value={consultation.labDirective}
+                                      onChange={e => setConsultation({...consultation, labDirective: e.target.value})}
+                                     />
                                   </div>
-                                  
-                                  {labRequest && (
-                                     <div className="mt-8 flex items-center gap-2 p-3 bg-white rounded-lg border border-slate-200 shadow-sm animate-bounce">
-                                        <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Test Authorized: {labRequest}</span>
-                                     </div>
-                                  )}
                                </div>
                             </div>
                           )}
@@ -382,7 +390,16 @@ export const Doctor: React.FC = () => {
                                           <Plus size={20} />
                                         </button>
                                      </div>
-                                     <p className="text-[10px] text-slate-400 italic">Drugs added here will be queued for the Pharmacy Department.</p>
+                                     <div className="space-y-2 pt-4">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">Pharmacist Directives</label>
+                                        <input 
+                                          type="text"
+                                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
+                                          placeholder="Compounding or dispensing notes..."
+                                          value={consultation.pharmacyDirective}
+                                          onChange={e => setConsultation({...consultation, pharmacyDirective: e.target.value})}
+                                        />
+                                     </div>
                                   </div>
                                   
                                   <div className="flex-1">
@@ -402,7 +419,7 @@ export const Doctor: React.FC = () => {
                                                 className="text-slate-300 hover:text-red-500 transition-colors"
                                                >
                                                   <X size={14} />
-                                               </button>
+                                                </button>
                                             </div>
                                           ))
                                         )}
@@ -426,6 +443,14 @@ export const Doctor: React.FC = () => {
 
                              <div className="flex items-center gap-3 w-full md:w-auto">
                                 <button 
+                                  onClick={handleSaveNotesOnly}
+                                  disabled={loading}
+                                  className="flex-1 md:flex-none px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+                                >
+                                  {loading && activeSubTab === 'notes' ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
+                                  Save Consultation
+                                </button>
+                                <button 
                                   onClick={() => setSelectedPatient(null)}
                                   className="flex-1 md:flex-none px-6 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-200"
                                 >
@@ -433,9 +458,10 @@ export const Doctor: React.FC = () => {
                                 </button>
                                 <button 
                                  onClick={handleSubmitConsultation}
-                                 className="flex-[2] md:flex-none px-8 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95"
+                                 disabled={loading}
+                                 className="flex-[2] md:flex-none px-8 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50"
                                 >
-                                  <Send size={18} />
+                                  {loading && activeSubTab !== 'notes' ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                                   Submit & Update Workflow
                                 </button>
                              </div>

@@ -35,6 +35,7 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patientId }) => {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [labResults, setLabResults] = useState<LabRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'bio' | 'clinical' | 'history'>('clinical');
+  const [showFullNotes, setShowFullNotes] = useState(false);
 
   useEffect(() => {
     const unsubPatient = onSnapshot(doc(db, 'patients', patientId), (snapshot) => {
@@ -122,9 +123,14 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patientId }) => {
           type: 'lab-res',
           timestamp: l.result.timestamp,
           label: `Lab Result Published: ${l.testType}`,
-          details: `Lab Tech ID: ${l.result.labTechId} • Result: ${l.result.result}`,
+          details: `Lab Tech ID: ${l.result.labTechId}`,
           icon: ClipboardList,
-          color: 'bg-emerald-500'
+          color: 'bg-emerald-500',
+          labResultData: {
+            result: l.result.result,
+            referenceRange: l.result.referenceRange,
+            comments: l.result.comments
+          }
         });
       }
       return events;
@@ -286,6 +292,24 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patientId }) => {
                 )}
               </section>
 
+              {/* Next Appointment Card */}
+              <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Scheduling</h3>
+                </div>
+                <div className="p-6 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <Calendar size={20} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5">Next Scheduled Appointment</label>
+                    <p className="text-sm font-bold text-slate-900">
+                      {patient.appointmentDate ? patient.appointmentDate : 'No upcoming appointment'}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
               {/* Lab Request Highlights */}
               <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
@@ -323,8 +347,18 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patientId }) => {
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-3">Clinical Progress Notes</label>
                           <div className="text-sm text-slate-700 leading-relaxed max-w-none whitespace-pre-wrap">
-                            {consultations[0].clinicalNotes}
+                            {consultations[0].clinicalNotes && consultations[0].clinicalNotes.length > 300 && !showFullNotes 
+                              ? `${consultations[0].clinicalNotes.substring(0, 300)}...` 
+                              : consultations[0].clinicalNotes}
                           </div>
+                          {consultations[0].clinicalNotes && consultations[0].clinicalNotes.length > 300 && (
+                            <button 
+                              onClick={() => setShowFullNotes(!showFullNotes)}
+                              className="mt-2 text-blue-600 text-xs font-bold hover:underline underline-offset-4"
+                            >
+                              {showFullNotes ? 'Show Less' : 'Read Full Clinical Notes'}
+                            </button>
+                          )}
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-3">Treatment & Management Plan</label>
@@ -425,6 +459,26 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patientId }) => {
                             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
                               {event.details} • {format(new Date(event.timestamp.seconds * 1000), 'PP p')}
                             </p>
+                            {(event as any).labResultData && (
+                              <div className="mt-3 space-y-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Investigation Result</p>
+                                    <p className="text-sm font-black text-blue-600">{(event as any).labResultData.result}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Reference Range</p>
+                                    <p className="text-sm font-bold text-slate-600">{(event as any).labResultData.referenceRange}</p>
+                                  </div>
+                                </div>
+                                {(event as any).labResultData.comments && (
+                                  <div className="pt-3 border-t border-slate-50">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pathologist Comments</p>
+                                    <p className="text-xs text-slate-600 italic leading-relaxed">"{(event as any).labResultData.comments}"</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             {(event as any).notes && (
                               <div className="mt-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
                                 "{(event as any).notes}"
