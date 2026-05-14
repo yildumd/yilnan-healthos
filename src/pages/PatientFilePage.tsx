@@ -2,12 +2,43 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { PatientFile } from '../components/PatientFile';
-import { ChevronLeft, Printer, Share2 } from 'lucide-react';
+import { ChevronLeft, Printer, Share2, ShieldAlert } from 'lucide-react';
 import { motion } from 'motion/react';
+import { UserRole } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
-export const PatientFilePage: React.FC = () => {
+interface PatientFilePageProps {
+  userRole?: UserRole;
+}
+
+export const PatientFilePage: React.FC<PatientFilePageProps> = ({ userRole }) => {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
+  const { role: authRole, loading } = useAuth();
+
+  // Use passed prop or fallback to auth context
+  const effectiveRole = userRole || authRole;
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-screen">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!effectiveRole) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center p-20 text-center">
+          <ShieldAlert size={48} className="text-red-400 mb-4" />
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Access Denied – No role assigned</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!patientId) {
     return (
@@ -37,14 +68,19 @@ export const PatientFilePage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
-              <Printer size={14} />
-              Print File
-            </button>
-            <button className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-xl shadow-slate-200/50">
-              <Share2 size={14} className="text-blue-400" />
-              Transfer Records
-            </button>
+            {/* Only allow print/share for clinical staff (optional) */}
+            {effectiveRole !== 'Patient' && (
+              <>
+                <button className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                  <Printer size={14} />
+                  Print File
+                </button>
+                <button className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-xl shadow-slate-200/50">
+                  <Share2 size={14} className="text-blue-400" />
+                  Transfer Records
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -53,7 +89,7 @@ export const PatientFilePage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <PatientFile patientId={patientId} />
+          <PatientFile patientId={patientId} userRole={effectiveRole} />
         </motion.div>
       </div>
     </Layout>

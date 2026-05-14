@@ -1,5 +1,9 @@
+// ========== Core Roles ==========
 export type UserRole = 'Records' | 'Accounts' | 'Nurse' | 'Doctor' | 'Lab Technician' | 'Pharmacy' | 'Admin';
+// Alias for backward compatibility with components expecting 'Role'
+export type Role = UserRole;
 
+// ========== Patient Status ==========
 export type PatientStatus = 
   | 'waiting_payment' 
   | 'ready_nursing' 
@@ -8,6 +12,7 @@ export type PatientStatus =
   | 'at_pharmacy' 
   | 'completed';
 
+// ========== Patient ==========
 export interface Patient {
   id: string;
   fileNumber: string;
@@ -22,21 +27,27 @@ export interface Patient {
   appointmentDate: string;
   status: PatientStatus;
   walletBalance: number;
-  createdAt: any;
+  createdAt: any;   // Firestore Timestamp
   updatedAt: any;
+  // Optional fields (used in UI forms, safe to add)
+  email?: string;
+  emergencyContactPhone?: string;
+  allergies?: string[];  // or string (comma separated)
 }
 
+// ========== Vitals ==========
 export interface Vitals {
   id?: string;
-  bp: string;
-  temp: number;
-  pulse: number;
-  weight: number;
+  bp: string;           // blood pressure, e.g., "120/80"
+  temp: number;         // celsius
+  pulse: number;        // bpm
+  weight: number;       // kg
   observations: string;
   nurseId: string;
   timestamp: any;
 }
 
+// ========== Consultation (Doctor's note) ==========
 export interface Consultation {
   id?: string;
   diagnosis: string;
@@ -46,16 +57,19 @@ export interface Consultation {
   timestamp: any;
 }
 
+// ========== Prescription ==========
 export interface Prescription {
   id?: string;
-  medications: string[];
+  medications: string[];   // e.g., ["Amoxicillin 500mg - 1x/day for 7 days"]
   status: 'pending' | 'dispensed';
   doctorId: string;
   timestamp: any;
 }
 
+// ========== Lab Request & Result ==========
 export interface LabRequest {
   id?: string;
+  patientId?: string;      // to link back to patient (useful for queries)
   testType: string;
   status: 'pending' | 'completed';
   doctorId: string;
@@ -70,15 +84,18 @@ export interface LabRequest {
   };
 }
 
+// ========== Financial Transaction ==========
+export type TransactionType = 'deposit' | 'debit';
 export interface Transaction {
   id?: string;
-  type: 'deposit' | 'debit';
+  type: TransactionType;
   amount: number;
   description: string;
   timestamp: any;
   staffId: string;
 }
 
+// ========== Drug Inventory ==========
 export interface Drug {
   id: string;
   name: string;
@@ -90,10 +107,13 @@ export interface Drug {
   lastUpdated: any;
 }
 
+// ========== Audit Log (enhanced) ==========
 export interface AuditLog {
   id?: string;
-  department: string;
-  role: string;
+  patientId: string;      // required to associate with patient timeline
+  staffId: string;        // who performed action
+  department: string;     // e.g., 'Records', 'Nurse'
+  role: string;           // UserRole
   action: string;
   timestamp: any;
 }

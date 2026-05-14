@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { PatientService } from '../lib/patientService';
-import { Patient, Vitals } from '../types';
+import { Patient, Vitals, UserRole } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { PatientFile } from '../components/PatientFile';
 import { 
@@ -19,20 +19,27 @@ import {
   Search,
   UserPlus,
   FileText,
-  Loader2
+  Loader2,
+  AlertCircle,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-export const Nursing: React.FC = () => {
+// Optional: Role guard – only Nurses should access
+const REQUIRED_ROLE: UserRole = 'Nurse';
+
+export const Nursing: React.FC<{ userRole?: UserRole }> = ({ userRole }) => {
   const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [allPatients, setAllPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedPatientData, setSelectedPatientData] = useState<Patient | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [vitals, setVitals] = useState({
     bp: '',
     temp: '',
@@ -41,51 +48,122 @@ export const Nursing: React.FC = () => {
     observations: ''
   });
 
+  // Role guard
+  if (userRole && userRole !== REQUIRED_ROLE) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-[400px] space-y-6">
+          <div className="p-6 bg-red-50 text-red-600 rounded-full"><ShieldAlert size={48} /></div>
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-black text-slate-900 uppercase">Access Restricted</h2>
+            <p className="text-sm text-slate-500 max-w-xs">Only Nurses can access the Nursing queue.</p>
+          </div>
+          <button onClick={() => navigate('/')} className="px-6 py-2 bg-slate-900 text-white rounded-md text-[10px] font-black uppercase tracking-widest">
+            Return to Dashboard
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Subscribe to patients waiting for nursing (status = 'ready_nursing')
   useEffect(() => {
     const unsubQueue = PatientService.subscribeToQueue('ready_nursing', setPatients);
-    
+    return () => unsubQueue();
+  }, []);
+
+  // Subscribe to all patients for manual search (global registry)
+  useEffect(() => {
     const q = query(collection(db, 'patients'), orderBy('fullName'));
     const unsubAll = onSnapshot(q, (snapshot) => {
       setAllPatients(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Patient)));
     });
-
-    return () => {
-      unsubQueue();
-      unsubAll();
-    };
+    return () => unsubAll();
   }, []);
+
+  // Real‑time subscription to selected patient's data (to reflect status changes)
+  useEffect(() => {
+    if (!selectedPatient) {
+      setSelectedPatientData(null);
+      return;
+    }
+    const patientRef = doc(db, 'patients', selectedPatient.id);
+    const unsub = onSnapshot(patientRef, (snap) => {
+      if (snap.exists()) {
+        setSelectedPatientData({ id: snap.id, ...snap.data() } as Patient);
+      } else {
+        setSelectedPatientData(null);
+      }
+    });
+    return () => unsub();
+  }, [selectedPatient]);
 
   const filteredPatients = allPatients.filter(p => 
     p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.fileNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const validateVitals = () => {
+    if (!vitals.bp.match(/^\d{2,3}\/\d{2,3}$/)) {
+      setError('Blood pressure must be in format e.g., 120/80');
+      return false;
+    }
+    const temp = parseFloat(vitals.temp);
+    if (isNaN(temp) || temp < 30 || temp > 45) {
+      setError('Temperature must be between 30°C and 45°C');
+      return false;
+    }
+    const pulse = parseInt(vitals.pulse);
+    if (isNaN(pulse) || pulse < 30 || pulse > 200) {
+      setError('Pulse must be between 30 and 200 BPM');
+      return false;
+    }
+    const weight = parseFloat(vitals.weight);
+    if (isNaN(weight) || weight < 1 || weight > 300) {
+      setError('Weight must be between 1 and 300 kg');
+      return false;
+    }
+    if (!vitals.observations.trim()) {
+      setError('Observations are required');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmitVitals = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient || loading) return;
+    if (!selectedPatientData || submitting) return;
+    if (!validateVitals()) return;
 
-    setLoading(true);
+    setSubmitting(true);
+    setError('');
+
     try {
-      const vitalsRef = collection(db, `patients/${selectedPatient.id}/vitals`);
-      await addDoc(vitalsRef, {
+      // Add vitals using the service
+      await PatientService.addVitals(selectedPatientData.id, {
         bp: vitals.bp,
         temp: parseFloat(vitals.temp),
         pulse: parseInt(vitals.pulse),
         weight: parseFloat(vitals.weight),
         observations: vitals.observations,
-        nurseId: 'NURSE_01',
-        timestamp: serverTimestamp()
+        nurseId: 'NURSE_01', // In real app, get from auth context
       });
 
-      await PatientService.updateStatus(selectedPatient.id, 'waiting_doctor', 'Nurse');
+      // Update patient status to 'waiting_doctor'
+      await PatientService.updateStatus(selectedPatientData.id, 'waiting_doctor', 'Nurse');
+
+      // Clear form and close panel
       setSelectedPatient(null);
+      setSelectedPatientData(null);
       setVitals({ bp: '', temp: '', pulse: '', weight: '', observations: '' });
-    } catch (error) {
-      alert("Error submitting vitals: " + (error as any).message);
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit vitals. Please try again.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
+
+  const currentPatient = selectedPatientData || selectedPatient;
 
   return (
     <Layout>
@@ -154,15 +232,15 @@ export const Nursing: React.FC = () => {
           {/* Action Center */}
           <div className="lg:col-span-2">
              <AnimatePresence mode="wait">
-               {selectedPatient ? (
+               {currentPatient ? (
                  <motion.div 
-                   key={selectedPatient.id}
+                   key={currentPatient.id}
                    initial={{ opacity: 0, y: 10 }}
                    animate={{ opacity: 1, y: 0 }}
                    exit={{ opacity: 0, x: -10 }}
                    className="space-y-6"
                  >
-                    <PatientFile patientId={selectedPatient.id} />
+                    <PatientFile patientId={currentPatient.id} />
 
                     <div className="bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
                        <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
@@ -173,20 +251,26 @@ export const Nursing: React.FC = () => {
                        </div>
                        
                        <form onSubmit={handleSubmitVitals} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6 bg-white overflow-y-auto max-h-[500px] scrollbar-hide">
+                          {error && (
+                            <div className="md:col-span-2 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-700 text-xs">
+                              <AlertCircle size={14} />
+                              {error}
+                            </div>
+                          )}
                           <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Blood Pressure (mmHg)</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Blood Pressure (mmHg) *</label>
                             <input 
                               required
                               type="text" 
                               placeholder="e.g. 120/80" 
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
                               value={vitals.bp}
-                              onChange={e => setVitals({...vitals, bp: e.target.value})}
+                              onChange={e => { setVitals({...vitals, bp: e.target.value}); setError(''); }}
                             />
                           </div>
 
                           <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Body Temp (°C)</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Body Temp (°C) *</label>
                             <input 
                               required
                               type="number" 
@@ -194,24 +278,24 @@ export const Nursing: React.FC = () => {
                               placeholder="e.g. 36.5" 
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
                               value={vitals.temp}
-                              onChange={e => setVitals({...vitals, temp: e.target.value})}
+                              onChange={e => { setVitals({...vitals, temp: e.target.value}); setError(''); }}
                             />
                           </div>
 
                           <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Heart Pulse (BPM)</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Heart Pulse (BPM) *</label>
                             <input 
                               required
                               type="number" 
                               placeholder="e.g. 72" 
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
                               value={vitals.pulse}
-                              onChange={e => setVitals({...vitals, pulse: e.target.value})}
+                              onChange={e => { setVitals({...vitals, pulse: e.target.value}); setError(''); }}
                             />
                           </div>
 
                           <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Body Weight (KG)</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Body Weight (KG) *</label>
                             <input 
                               required
                               type="number" 
@@ -219,19 +303,19 @@ export const Nursing: React.FC = () => {
                               placeholder="e.g. 70.5" 
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
                               value={vitals.weight}
-                              onChange={e => setVitals({...vitals, weight: e.target.value})}
+                              onChange={e => { setVitals({...vitals, weight: e.target.value}); setError(''); }}
                             />
                           </div>
 
                           <div className="md:col-span-2 space-y-2">
-                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Observations & Complaints</label>
+                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 px-1">Observations & Complaints *</label>
                             <textarea 
                               required
                               rows={4}
                               placeholder="Note patient complaints or physical observations..."
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm italic text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner placeholder:text-slate-300"
                               value={vitals.observations}
-                              onChange={e => setVitals({...vitals, observations: e.target.value})}
+                              onChange={e => { setVitals({...vitals, observations: e.target.value}); setError(''); }}
                             />
                           </div>
                        </form>
@@ -243,21 +327,25 @@ export const Nursing: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-3">
                              <button 
-                               disabled={loading}
+                               disabled={submitting}
                                type="button"
-                               onClick={() => setSelectedPatient(null)}
+                               onClick={() => {
+                                 setSelectedPatient(null);
+                                 setError('');
+                                 setVitals({ bp: '', temp: '', pulse: '', weight: '', observations: '' });
+                               }}
                                className="px-6 py-3 text-sm font-bold text-slate-500 hover:bg-white rounded-xl transition-all border border-transparent hover:border-slate-200 disabled:opacity-50"
                              >
                                Cancel
                              </button>
                              <button 
-                               disabled={loading}
+                               disabled={submitting}
                                onClick={handleSubmitVitals}
                                type="submit"
                                className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                              >
-                               {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-                               {loading ? "Processing..." : "Authorize & Push to Physician"}
+                               {submitting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                               {submitting ? "Processing..." : "Authorize & Push to Physician"}
                              </button>
                           </div>
                        </div>
