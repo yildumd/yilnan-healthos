@@ -11,9 +11,12 @@ import {
   Settings, 
   LogOut,
   Search,
-  Bell
+  Bell,
+  FolderOpen,
+  Menu,
+  X
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const sidebarItems = [
   { role: 'Records', icon: Users, label: 'Records', path: '/records' },
@@ -23,16 +26,22 @@ const sidebarItems = [
   { role: 'Lab Technician', icon: Beaker, label: 'Laboratory', path: '/lab' },
   { role: 'Pharmacy', icon: Pill, label: 'Pharmacy', path: '/pharmacy' },
   { role: 'Admin', icon: Settings, label: 'Administration', path: '/admin' },
+  { role: 'Records', icon: FolderOpen, label: 'Patient Files', path: '/records' },
 ];
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { role, setRole } = useAuth();
+  const { role, setRole, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
-    setRole(null);
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const [search, setSearch] = useState('');
@@ -45,8 +54,15 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   return (
     <div className="flex flex-col h-screen w-full bg-slate-50 font-sans text-slate-900 overflow-hidden selection:bg-blue-100">
       {/* Top Header */}
-      <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-50">
-        <div className="flex items-center gap-6">
+      <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 shrink-0 z-50">
+        <div className="flex items-center gap-3 md:gap-6">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="lg:hidden w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-50 rounded-xl transition-all"
+          >
+            {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
           <div className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate('/')}>
              <div className="w-9 h-9 bg-slate-900 rounded-lg flex items-center justify-center shadow-xl shadow-slate-200">
                 <HeartPulse className="text-blue-400 w-5 h-5" />
@@ -57,38 +73,38 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
              </div>
           </div>
           
-          <div className="h-8 w-px bg-slate-100 mx-2"></div>
+          <div className="h-8 w-px bg-slate-100 mx-1 md:mx-2 hidden sm:block"></div>
           
-          <div className="flex items-center gap-2 text-[9px] bg-slate-50 text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200 font-bold uppercase tracking-widest">
+          <div className="hidden sm:flex items-center gap-2 text-[9px] bg-slate-50 text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200 font-bold uppercase tracking-widest">
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
             Node: <span className="text-slate-900 tracking-normal ml-0.5">{role}</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-8">
-          <form onSubmit={handleSearch} className="relative group hidden lg:block">
+        <div className="flex items-center gap-4 md:gap-8">
+          <form onSubmit={handleSearch} className="relative group hidden xl:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
             <input 
               type="text" 
               placeholder="Search Integrated Patient Master File..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-96 h-10 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:ring-1 focus:ring-blue-500 focus:bg-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 shadow-inner"
+              className="w-80 2xl:w-96 h-10 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:ring-1 focus:ring-blue-500 focus:bg-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 shadow-inner"
             />
           </form>
           
-          <div className="flex items-center gap-6 border-l border-slate-100 pl-8">
+          <div className="flex items-center gap-3 md:gap-6 border-l border-slate-100 pl-4 md:pl-8">
              <button className="text-slate-400 hover:text-blue-600 transition-colors relative">
                <Bell size={18} />
                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
              </button>
              
-             <div className="flex items-center gap-4 group cursor-pointer">
-               <div className="text-right leading-none hidden xl:block">
+             <div className="flex items-center gap-3 md:gap-4 group cursor-pointer">
+               <div className="text-right leading-none hidden sm:block">
                  <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight">Active Operator</p>
                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Operational</p>
                </div>
-               <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-blue-400 text-xs shadow-lg transform group-hover:scale-105 transition-all">
+               <div className="w-9 md:w-10 h-9 md:h-10 rounded-lg md:rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-blue-400 text-xs shadow-lg transform group-hover:scale-105 transition-all">
                  {role?.[0]}
                </div>
              </div>
@@ -96,9 +112,25 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Navigation Sidebar */}
-        <aside className="w-64 bg-white border-r border-slate-200 flex flex-col px-4 py-8 shrink-0 overflow-y-auto">
+        <AnimatePresence>
+          {isSidebarOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarOpen(false)}
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-30 lg:hidden"
+            />
+          )}
+        </AnimatePresence>
+
+        <aside className={`
+          fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 flex flex-col px-4 py-8 shrink-0 overflow-y-auto transition-transform duration-300 transform
+          lg:relative lg:translate-x-0
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
           <div className="px-4 mb-10">
              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Cloud Infrastructure</p>
              <nav className="space-y-1.5">
@@ -110,6 +142,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                      onClick={() => {
                        setRole(item.role as any);
                        navigate(item.path);
+                       setIsSidebarOpen(false);
                      }}
                      className={`w-full flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all group relative overflow-hidden ${
                        isActive 

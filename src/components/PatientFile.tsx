@@ -68,49 +68,112 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patientId }) => {
 
   if (!patient) return null;
 
+  const timelineEvents = [
+    ...(patient.createdAt ? [{
+      id: 'reg',
+      type: 'registration',
+      timestamp: patient.createdAt,
+      label: 'Patient Admitted / File Created',
+      details: 'Records Department',
+      icon: User,
+      color: 'bg-blue-500'
+    }] : []),
+    ...vitals.map(v => ({
+      id: v.id,
+      type: 'vitals',
+      timestamp: v.timestamp,
+      label: 'Clinical Vitals Captured',
+      details: `Nurse ID: ${v.nurseId} • BP: ${v.bp}, Temp: ${v.temp}°C`,
+      icon: Activity,
+      color: 'bg-indigo-500'
+    })),
+    ...consultations.map(c => ({
+      id: c.id,
+      type: 'consultation',
+      timestamp: c.timestamp,
+      label: 'Physician Consultation',
+      details: `Dr. ${c.doctorId} • Diagnosis: ${c.diagnosis}`,
+      icon: Stethoscope,
+      color: 'bg-emerald-600',
+      notes: c.treatmentPlan
+    })),
+    ...prescriptions.map(p => ({
+      id: p.id,
+      type: 'prescription',
+      timestamp: p.timestamp,
+      label: 'Pharmacy Prescription Issued',
+      details: `Dr. ${p.doctorId} • ${p.medications.length} items prescribed`,
+      icon: Pill,
+      color: 'bg-purple-500'
+    })),
+    ...labResults.flatMap(l => {
+      const events: any[] = [{
+        id: l.id + '-req',
+        type: 'lab-req',
+        timestamp: l.timestamp,
+        label: `Lab Investigation Requested: ${l.testType}`,
+        details: `Dr. ${l.doctorId} • Status: ${l.status}`,
+        icon: Beaker,
+        color: 'bg-amber-500'
+      }];
+      if (l.status === 'completed' && l.result) {
+        events.push({
+          id: l.id + '-res',
+          type: 'lab-res',
+          timestamp: l.result.timestamp,
+          label: `Lab Result Published: ${l.testType}`,
+          details: `Lab Tech ID: ${l.result.labTechId} • Result: ${l.result.result}`,
+          icon: ClipboardList,
+          color: 'bg-emerald-500'
+        });
+      }
+      return events;
+    })
+  ].filter(e => e.timestamp && e.timestamp.seconds).sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Active Patient Toolbar */}
-      <div className="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 mb-6 rounded-xl shadow-sm">
+      <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0 mb-6 rounded-xl shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-base md:text-lg shrink-0">
             {patient.fullName.split(' ').map(n => n[0]).join('')}
           </div>
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold text-slate-900">{patient.fullName}</h2>
-              <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-medium">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
+              <h2 className="text-lg md:text-xl font-bold text-slate-900 truncate">{patient.fullName}</h2>
+              <span className="text-[10px] md:text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-medium whitespace-nowrap">
                 {patient.gender}, {patient.dob ? new Date().getFullYear() - new Date(patient.dob).getFullYear() : 'N/A'} yrs
               </span>
             </div>
-            <p className="text-sm text-slate-500 font-medium tracking-tight">
-              File ID: <span className="text-slate-900 font-bold">{patient.fileNumber}</span> • Type: {patient.patientType} • Phone: {patient.phoneNumber}
+            <p className="text-xs md:text-sm text-slate-500 font-medium tracking-tight truncate">
+              ID: <span className="text-slate-900 font-bold">{patient.fileNumber}</span> • {patient.phoneNumber}
             </p>
           </div>
         </div>
         
-        <div className="flex gap-4">
-          <div className="bg-emerald-50 border border-emerald-100 p-2 px-4 rounded-lg hidden sm:block leading-tight">
-            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-tight">Wallet Balance</p>
-            <p className="text-lg font-bold text-emerald-700">₦{patient.walletBalance.toLocaleString()}.00</p>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="bg-emerald-50 border border-emerald-100 p-2 px-3 md:px-4 rounded-lg flex-1 sm:flex-none leading-tight">
+            <p className="text-[9px] md:text-[10px] text-emerald-600 font-bold uppercase tracking-tight">Wallet Balance</p>
+            <p className="text-base md:text-lg font-bold text-emerald-700">₦{patient.walletBalance.toLocaleString()}</p>
           </div>
-          <button className="px-5 h-10 bg-slate-900 text-white rounded-lg font-bold text-sm shadow-lg shadow-slate-200 hover:bg-slate-800 transition-colors flex items-center gap-2">
-            View History
+          <button className="px-4 md:px-5 h-10 bg-slate-900 text-white rounded-lg font-bold text-xs md:text-sm shadow-lg shadow-slate-200 hover:bg-slate-800 transition-colors flex items-center gap-2 whitespace-nowrap">
+            History
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 mb-6 px-2 shrink-0">
+      <div className="flex border-b border-slate-200 mb-6 px-2 shrink-0 overflow-x-auto scrollbar-hide -mx-2 md:mx-0">
         {[
-          { id: 'bio', label: 'Patient Profile', icon: User },
-          { id: 'clinical', label: 'Consultation & Vitals', icon: Stethoscope },
-          { id: 'history', label: 'History & Timeline', icon: History }
+          { id: 'bio', label: 'Profile', icon: User },
+          { id: 'clinical', label: 'Consultation', icon: Stethoscope },
+          { id: 'history', label: 'History', icon: History }
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 py-3 px-6 text-sm font-bold transition-all relative ${
+            className={`flex items-center gap-2 py-3 px-4 md:px-6 text-xs md:text-sm font-bold transition-all relative shrink-0 ${
               activeTab === tab.id ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
@@ -316,15 +379,15 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patientId }) => {
                     )}
                  </div>
                  
-                 <div className="p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-xl flex items-center justify-between">
+                 <div className="p-4 md:p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Attending Doc ID: {consultations[0]?.doctorId || 'UNASSIGNED'}</span>
                     </div>
-                    <div className="flex gap-3">
-                      <button className="px-6 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all">
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <button className="flex-1 sm:flex-none px-4 md:px-6 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs md:text-sm font-bold hover:bg-slate-50 transition-all">
                         Archive File
                       </button>
-                      <button className="px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold shadow-md hover:bg-slate-800 transition-all">
+                      <button className="flex-1 sm:flex-none px-4 md:px-6 py-2 bg-slate-900 text-white rounded-lg text-xs md:text-sm font-bold shadow-md hover:bg-slate-800 transition-all">
                         Finalize & Send
                       </button>
                     </div>
@@ -340,55 +403,44 @@ export const PatientFile: React.FC<PatientFileProps> = ({ patientId }) => {
                 <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Enterprise Case Timeline</h3>
                 </div>
-                <div className="p-8 space-y-10 relative before:absolute before:left-[39px] before:top-8 before:bottom-8 before:w-px before:bg-slate-100">
-                   <div className="flex gap-6 relative">
-                      <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400 z-10 shrink-0 shadow-sm">
-                         {patient.createdAt?.seconds ? format(new Date(patient.createdAt.seconds * 1000), 'HH:mm') : '--:--'}
-                      </div>
-                      <div className="flex gap-3 pt-1">
-                        <div className="w-1 bg-blue-500 rounded-full h-8"></div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">Patient Admitted / Case File Opened</p>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">
-                            Staff: Records Dept • {patient.createdAt?.seconds ? format(new Date(patient.createdAt.seconds * 1000), 'PP p') : 'N/A'}
-                          </p>
+                <div className="p-8 space-y-10 relative before:absolute before:left-[39px] before:top-8 before:bottom-8 before:w-px before:bg-slate-100 h-full overflow-y-auto scrollbar-hide">
+                   {timelineEvents.map((event, index) => (
+                     <motion.div 
+                       key={event.id || index}
+                       initial={{ opacity: 0, x: -20 }}
+                       animate={{ opacity: 1, x: 0 }}
+                       transition={{ delay: index * 0.05 }}
+                       className="flex gap-6 relative"
+                     >
+                        <div className={`w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400 z-10 shrink-0 shadow-sm`}>
+                           {format(new Date(event.timestamp.seconds * 1000), 'HH:mm')}
                         </div>
-                      </div>
-                   </div>
-
-                   {vitals.map(v => (
-                     <div key={v.id} className="flex gap-6 relative">
-                        <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400 z-10 shrink-0 shadow-sm">
-                           {format(new Date(v.timestamp.seconds * 1000), 'HH:mm')}
-                        </div>
-                        <div className="flex gap-3 pt-1">
-                          <div className="w-1 bg-indigo-500 rounded-full h-8"></div>
+                        <div className="flex gap-3 pt-1 flex-1">
+                          <div className={`w-1 ${event.color} rounded-full h-8 shrink-0`}></div>
                           <div>
-                            <p className="text-sm font-bold text-slate-900">Vitals Logged by Nursing Staff</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">
-                              Nurse ID: {v.nurseId} • {format(new Date(v.timestamp.seconds * 1000), 'PP p')}
+                            <div className="flex items-center gap-2 mb-1">
+                              <event.icon size={14} className="text-slate-400" />
+                              <p className="text-sm font-bold text-slate-900">{event.label}</p>
+                            </div>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
+                              {event.details} • {format(new Date(event.timestamp.seconds * 1000), 'PP p')}
                             </p>
+                            {(event as any).notes && (
+                              <div className="mt-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
+                                "{(event as any).notes}"
+                              </div>
+                            )}
                           </div>
                         </div>
-                     </div>
+                     </motion.div>
                    ))}
 
-                   {consultations.map(c => (
-                     <div key={c.id} className="flex gap-6 relative">
-                        <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400 z-10 shrink-0 shadow-sm">
-                           {format(new Date(c.timestamp.seconds * 1000), 'HH:mm')}
-                        </div>
-                        <div className="flex gap-3 pt-1">
-                          <div className="w-1 bg-emerald-600 rounded-full h-8"></div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-900">Consultation Session Finalized</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">
-                              Physician: Dr. {c.doctorId} • {format(new Date(c.timestamp.seconds * 1000), 'PP p')}
-                            </p>
-                          </div>
-                        </div>
+                   {timelineEvents.length === 0 && (
+                     <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                        <History size={48} className="text-slate-100 mb-4" />
+                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No History Recorded</p>
                      </div>
-                   ))}
+                   )}
                 </div>
              </section>
 

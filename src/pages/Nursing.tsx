@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { PatientService } from '../lib/patientService';
 import { Patient, Vitals } from '../types';
@@ -17,18 +18,21 @@ import {
   History,
   Search,
   UserPlus,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export const Nursing: React.FC = () => {
+  const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [allPatients, setAllPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
   const [vitals, setVitals] = useState({
     bp: '',
     temp: '',
@@ -58,8 +62,9 @@ export const Nursing: React.FC = () => {
 
   const handleSubmitVitals = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient) return;
+    if (!selectedPatient || loading) return;
 
+    setLoading(true);
     try {
       const vitalsRef = collection(db, `patients/${selectedPatient.id}/vitals`);
       await addDoc(vitalsRef, {
@@ -77,6 +82,8 @@ export const Nursing: React.FC = () => {
       setVitals({ bp: '', temp: '', pulse: '', weight: '', observations: '' });
     } catch (error) {
       alert("Error submitting vitals: " + (error as any).message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -236,19 +243,21 @@ export const Nursing: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-3">
                              <button 
-                              type="button"
-                              onClick={() => setSelectedPatient(null)}
-                              className="px-6 py-3 text-sm font-bold text-slate-500 hover:bg-white rounded-xl transition-all border border-transparent hover:border-slate-200"
+                               disabled={loading}
+                               type="button"
+                               onClick={() => setSelectedPatient(null)}
+                               className="px-6 py-3 text-sm font-bold text-slate-500 hover:bg-white rounded-xl transition-all border border-transparent hover:border-slate-200 disabled:opacity-50"
                              >
                                Cancel
                              </button>
                              <button 
-                              onClick={handleSubmitVitals}
-                              type="submit"
-                              className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95"
+                               disabled={loading}
+                               onClick={handleSubmitVitals}
+                               type="submit"
+                               className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                              >
-                               <Send size={18} />
-                               Authorize & Push to Physician
+                               {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                               {loading ? "Processing..." : "Authorize & Push to Physician"}
                              </button>
                           </div>
                        </div>
@@ -269,6 +278,7 @@ export const Nursing: React.FC = () => {
                )}
              </AnimatePresence>
           </div>
+
         </div>
       </div>
 

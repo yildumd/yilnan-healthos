@@ -9,7 +9,9 @@ import {
   Send,
   FileSearch,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Search,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, updateDoc, doc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';

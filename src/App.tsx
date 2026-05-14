@@ -13,6 +13,7 @@ import { Pharmacy } from './pages/Pharmacy';
 import { Admin } from './pages/Admin';
 import { PatientOnboarding } from './pages/PatientOnboarding';
 import { PatientPortal } from './pages/PatientPortal';
+import { PatientFilePage } from './pages/PatientFilePage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role, loading } = useAuth();
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/lab" element={<ProtectedRoute><Lab /></ProtectedRoute>} />
           <Route path="/pharmacy" element={<ProtectedRoute><Pharmacy /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route path="/patient/:patientId" element={<ProtectedRoute><PatientFilePage /></ProtectedRoute>} />
           <Route path="/onboarding" element={<PatientOnboarding />} />
           <Route path="/portal" element={<PatientPortal />} />
           <Route path="*" element={<Navigate to="/" />} />
